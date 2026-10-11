@@ -74,6 +74,7 @@ export default function HomeScreen() {
         books: `${toBanglaDigits(String(wBooks.length))}টি বই`,
         followers: ` • ${formatBanglaCount(w.follower_count ?? 0)} জন ফলোয়ার`,
         cover: w.avatar_url ? { uri: w.avatar_url } : (wBooks[0] ? coverSource(wBooks[0].cover_url, wBooks[0].id) : coverSource(null, w.id)),
+        fallbackCover: wBooks[0] ? coverSource(wBooks[0].cover_url, wBooks[0].id) : coverSource(null, w.id),
         verified: isVerifiedWriter(w),
       };
     });
@@ -153,7 +154,7 @@ export default function HomeScreen() {
         <FlatList
           horizontal
           data={writers}
-          keyExtractor={(item) => item.name}
+          keyExtractor={(item) => item.id}
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.horizontalList}
           renderItem={({ item }) => <WriterCard writer={item} colors={colors} onPress={() => router.push({ pathname: '/profile/[id]', params: { id: item.id } })} />}
@@ -399,24 +400,38 @@ function SectionHeader({ title, onPress, colors }: { title: string; onPress: () 
   return <View style={styles.sectionHeader}><View style={[styles.sectionMark, { backgroundColor: colors.primary }]} /><Text style={[styles.sectionTitle, { color: colors.foreground }]}>{title}</Text><Pressable onPress={onPress} hitSlop={10}><Text style={[styles.seeAll, { color: colors.primary }]}>সব দেখুন…</Text></Pressable></View>;
 }
 
-function WriterCard({ writer, colors, onPress }: { writer: { id: string; name: string; books: string; followers: string; cover: unknown; verified: boolean }; colors: ReturnType<typeof useColors>; onPress: () => void }) {
+function WriterCard({ writer, colors, onPress }: { writer: { id: string; name: string; books: string; followers: string; cover: unknown; fallbackCover: unknown; verified: boolean }; colors: ReturnType<typeof useColors>; onPress: () => void }) {
   const { width } = useResponsive();
-  const cardWidth = Math.min(142, Math.round(width * 0.38));
+  const [coverFailed, setCoverFailed] = useState(false);
+  const cardWidth = Math.min(310, Math.max(264, Math.round(width - 76)));
   return (
-    <Pressable onPress={onPress} style={[styles.writerCard, { width: cardWidth, backgroundColor: colors.card, borderColor: colors.border }]}>
-      <View style={styles.writerClose}>
-        <Feather name="x" size={14} color={colors.mutedForeground} />
-      </View>
-      <Image source={writer.cover as never} resizeMode="cover" style={styles.writerAvatar} />
-      <VerifiedName
-        name={writer.name}
-        verified={writer.verified}
-        containerStyle={styles.writerNameRow}
-        nameStyle={[styles.writerName, { color: colors.foreground }]}
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${writer.name} লেখকের প্রোফাইল`}
+      style={({ pressed }) => [
+        styles.writerCard,
+        { width: cardWidth, backgroundColor: colors.card, borderColor: colors.border, opacity: pressed ? 0.88 : 1 },
+      ]}
+    >
+      <Image
+        source={(coverFailed ? writer.fallbackCover : writer.cover) as never}
+        onError={() => setCoverFailed(true)}
+        resizeMode="cover"
+        style={styles.writerAvatar}
       />
-      <Text numberOfLines={1} style={[styles.writerMeta, { color: colors.mutedForeground }]}>{writer.books}{writer.followers}</Text>
-      <View style={[styles.followButton, { backgroundColor: colors.primary }]}>
-        <Text style={[styles.followButtonText, { color: colors.primaryForeground }]}>প্রোফাইল</Text>
+      <View style={styles.writerDetails}>
+        <VerifiedName
+          name={writer.name}
+          verified={writer.verified}
+          containerStyle={styles.writerNameRow}
+          nameStyle={[styles.writerName, { color: colors.foreground }]}
+        />
+        <Text numberOfLines={1} style={[styles.writerMeta, { color: colors.mutedForeground }]}>{writer.books}{writer.followers}</Text>
+        <View style={[styles.followButton, { backgroundColor: colors.secondary }]}>
+          <Text style={[styles.followButtonText, { color: colors.primary }]}>প্রোফাইল দেখুন</Text>
+          <Feather name="arrow-up-right" size={13} color={colors.primary} />
+        </View>
       </View>
     </Pressable>
   );
@@ -453,14 +468,14 @@ const styles = StyleSheet.create({
   sectionTitle: { fontFamily: 'serif', fontSize: 17, fontWeight: '700', flex: 1 },
   seeAll: { backgroundColor: '#f9edf2', paddingVertical: 7, paddingHorizontal: 11, borderRadius: 16, fontSize: 11, fontWeight: '600' },
   horizontalList: { paddingHorizontal: 18, paddingTop: 11 },
-  writerCard: { width: 142, minHeight: 195, borderWidth: 1, borderRadius: 18, padding: 11, alignItems: 'center', marginRight: 10 },
-  writerClose: { position: 'absolute', top: 7, right: 7, zIndex: 1, width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  writerAvatar: { width: 76, height: 76, borderRadius: 38, marginTop: 7 },
-  writerNameRow: { maxWidth: '100%', justifyContent: 'center', marginTop: 10 },
-  writerName: { fontFamily: 'serif', fontSize: 15, fontWeight: '700' },
-  writerMeta: { fontSize: 9, marginTop: 4 },
-  followButton: { width: '100%', borderRadius: 12, alignItems: 'center', paddingVertical: 8, marginTop: 12 },
-  followButtonText: { fontFamily: 'serif', fontSize: 12, fontWeight: '700' },
+  writerCard: { minHeight: 122, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 19, padding: 10, marginRight: 10 },
+  writerAvatar: { width: 76, height: 100, borderRadius: 13 },
+  writerDetails: { flex: 1, minWidth: 0, paddingLeft: 11, justifyContent: 'center' },
+  writerNameRow: { maxWidth: '100%' },
+  writerName: { fontFamily: 'serif', fontSize: 16, fontWeight: '700' },
+  writerMeta: { fontSize: 10, marginTop: 5 },
+  followButton: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 14, paddingVertical: 6, paddingHorizontal: 9, marginTop: 10 },
+  followButtonText: { fontFamily: 'serif', fontSize: 11, fontWeight: '700' },
   notice: { position: 'absolute', left: 18, right: 18, borderRadius: 17, minHeight: 52, paddingHorizontal: 17, flexDirection: 'row', gap: 10, alignItems: 'center' },
   noticeText: { color: '#fff', fontSize: 13, fontWeight: '600', flex: 1 },
   guideOverlay: { flex: 1, backgroundColor: 'rgba(10,35,52,0.92)', justifyContent: 'space-between' },

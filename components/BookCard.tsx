@@ -18,7 +18,9 @@ export function BookCard({ book, compact = false, onPress, onSave, saved = false
   const colors = useColors();
   const { width } = useResponsive();
   // Horizontal rails have 18px screen padding + 10px peek: never overflow small phones.
-  const cardWidth = compact ? Math.min(204, Math.round(width * 0.56)) : Math.min(286, Math.round(width - 76));
+  const cardWidth = compact
+    ? Math.min(204, Math.round(width * 0.56))
+    : Math.min(286, Math.max(260, Math.round(width - 76)));
   return (
     <Pressable
       testID={`book-card-${book.id}`}

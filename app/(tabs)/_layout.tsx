@@ -37,7 +37,6 @@ function NativeTabLayout() {
 function ClassicTabLayout() {
   const colors = useColors();
   const isIOS = Platform.OS === 'ios';
-  const isWeb = Platform.OS === 'web';
 
   return (
     <Tabs
@@ -45,65 +44,77 @@ function ClassicTabLayout() {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedForeground,
         headerShown: false,
+        tabBarLabelStyle: styles.tabLabel,
+        tabBarItemStyle: styles.tabItem,
         tabBarStyle: {
           position: 'absolute',
-          backgroundColor: isIOS ? 'transparent' : colors.background,
-          borderTopWidth: isWeb ? 1 : 0,
+          backgroundColor: isIOS ? 'transparent' : colors.card,
+          borderTopWidth: isIOS ? 0 : 1,
           borderTopColor: colors.border,
-          elevation: 0,
-          ...(isWeb ? { height: 84 } : {}),
+          borderTopLeftRadius: 22,
+          borderTopRightRadius: 22,
+          minHeight: 78,
+          elevation: 10,
         },
-        tabBarBackground: () =>
-          isIOS ? (
-            <View
-              style={[StyleSheet.absoluteFill, { backgroundColor: colors.background, opacity: 0.92 }]}
-            />
-          ) : isWeb ? (
-            <View
-              style={[
-                StyleSheet.absoluteFill,
-                { backgroundColor: colors.background },
-              ]}
-            />
-          ) : null,
+        tabBarBackground: isIOS
+          ? () => <View style={[StyleSheet.absoluteFill, styles.tabBarBackground, { backgroundColor: colors.card, opacity: 0.94 }]} />
+          : undefined,
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: 'হোম',
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="house" tintColor={color} size={24} />
-            ) : (
-              <Feather name="home" size={22} color={color} />
-            ),
+          tabBarIcon: ({ color, focused }) => (
+            <View style={[styles.tabIconPill, focused && { backgroundColor: colors.accent }]}>
+              {isIOS ? <SymbolView name="house" tintColor={color} size={22} /> : <Feather name="home" size={21} color={color} />}
+            </View>
+          ),
         }}
       />
       <Tabs.Screen
         name="audio"
         options={{
           title: 'অডিও',
-          tabBarIcon: ({ color }) => <Feather name="mic" size={22} color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <View style={[styles.tabIconPill, focused && { backgroundColor: colors.accent }]}>
+              <Feather name="mic" size={21} color={color} />
+            </View>
+          ),
         }}
       />
       <Tabs.Screen
         name="categories"
         options={{
           title: 'ক্যাটাগরি',
-          tabBarIcon: ({ color }) => <Feather name="grid" size={22} color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <View style={[styles.tabIconPill, focused && { backgroundColor: colors.accent }]}>
+              <Feather name="grid" size={21} color={color} />
+            </View>
+          ),
         }}
       />
       <Tabs.Screen
         name="library"
         options={{
           title: 'লাইব্রেরি',
-          tabBarIcon: ({ color }) => <Feather name="book-open" size={22} color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <View style={[styles.tabIconPill, focused && { backgroundColor: colors.accent }]}>
+              <Feather name="book-open" size={21} color={color} />
+            </View>
+          ),
         }}
       />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  tabBarBackground: { borderTopLeftRadius: 22, borderTopRightRadius: 22, overflow: 'hidden' },
+  tabItem: { paddingTop: 5 },
+  tabIconPill: { minWidth: 60, height: 32, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  tabLabel: { fontSize: 11, marginTop: 2, fontWeight: '600' },
+});
 
 export default function TabLayout() {
   if (isLiquidGlassAvailable()) {
