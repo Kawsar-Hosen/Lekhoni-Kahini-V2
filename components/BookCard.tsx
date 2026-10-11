@@ -1,5 +1,6 @@
 import { Feather, MaterialIcons } from '@expo/vector-icons';
-import { Image, Pressable, StyleSheet, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Animated, Image, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { AppText as Text } from '@/components/AppText';
 import { VerifiedName } from '@/components/VerifiedName';
 import { useColors } from '@/hooks/useColors';
@@ -17,10 +18,26 @@ type BookCardProps = {
 export function BookCard({ book, compact = false, onPress, onSave, saved = false }: BookCardProps) {
   const colors = useColors();
   const { width } = useResponsive();
+  const statusScale = useRef(new Animated.Value(1)).current;
   // Horizontal rails have 18px screen padding + 10px peek: never overflow small phones.
   const cardWidth = compact
     ? Math.min(204, Math.round(width * 0.56))
     : Math.min(286, Math.max(260, Math.round(width - 76)));
+
+  useEffect(() => {
+    if (compact) return;
+    statusScale.setValue(0.97);
+    const animation = Animated.timing(statusScale, {
+      toValue: 1,
+      duration: 190,
+      useNativeDriver: Platform.OS !== 'web',
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [book.status, compact, statusScale]);
+
+  const ongoing = book.status === 'চলমান';
+
   return (
     <Pressable
       testID={`book-card-${book.id}`}
@@ -66,9 +83,15 @@ export function BookCard({ book, compact = false, onPress, onSave, saved = false
               <MaterialIcons name="menu-book" size={14} color={colors.primary} />
               <Text style={[styles.pillText, { color: colors.primary }]}>পড়ুন</Text>
             </View>
-            <View style={[styles.statusPill, { backgroundColor: book.status === 'চলমান' ? colors.success : colors.sky }]}>
-              <Text style={[styles.pillText, { color: book.status === 'চলমান' ? colors.successText : colors.skyText }]}>{book.status}</Text>
-            </View>
+            <Animated.View
+              style={[
+                styles.statusPill,
+                { backgroundColor: ongoing ? colors.success : colors.sky },
+                { transform: [{ scale: statusScale }] },
+              ]}
+            >
+              <Text style={[styles.pillText, { color: ongoing ? colors.successText : colors.skyText }]}>{book.status}</Text>
+            </Animated.View>
           </View>
         ) : null}
       </View>

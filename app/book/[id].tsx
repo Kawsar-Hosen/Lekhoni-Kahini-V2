@@ -1,6 +1,6 @@
 import { Feather, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Image, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText as Text } from '@/components/AppText';
@@ -35,14 +35,36 @@ export default function BookDetailScreen() {
   const [reaction, setReaction] = useState<'like' | 'unlike' | null>(null);
   const [notice, setNotice] = useState('');
   const [liking, setLiking] = useState(false);
+  const [likeCountOverride, setLikeCountOverride] = useState<number | null>(null);
+  const [unlikeCountOverride, setUnlikeCountOverride] = useState<number | null>(null);
+  const lastServerCounts = useRef({ likes: 0, dislikes: 0 });
+  const statusScale = useRef(new Animated.Value(1)).current;
   const saved = book ? savedIds.includes(book.id) : false;
   const downloaded = book ? downloadedIds.includes(book.id) : false;
   const serverLikes = apiBook ? bookLikesCount(apiBook) : 0;
-  const likeCount = serverLikes + (reaction === 'like' ? 1 : 0);
   const serverDislikes = apiBook?.dislikes !== undefined ? bookViewsCount({ views: apiBook.dislikes }) : 0;
-  const unlikeCount = serverDislikes + (reaction === 'unlike' ? 1 : 0);
+  const likeCount = likeCountOverride ?? serverLikes;
+  const unlikeCount = unlikeCountOverride ?? serverDislikes;
   const topInset = Platform.OS === 'web' ? Math.max(insets.top, 67) : insets.top;
   const authorPortrait = apiBook ? coverSource(null, displayAuthor(apiBook)) : require('@/assets/images/author-profile.png');
+
+  useEffect(() => {
+    if (serverLikes !== lastServerCounts.current.likes) setLikeCountOverride(null);
+    if (serverDislikes !== lastServerCounts.current.dislikes) setUnlikeCountOverride(null);
+    lastServerCounts.current = { likes: serverLikes, dislikes: serverDislikes };
+  }, [serverLikes, serverDislikes]);
+
+  useEffect(() => {
+    if (!book) return;
+    statusScale.setValue(0.97);
+    const animation = Animated.timing(statusScale, {
+      toValue: 1,
+      duration: 190,
+      useNativeDriver: Platform.OS !== 'web',
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [book?.status, statusScale]);
 
   const startReading = () => {
     if (!book) return;
@@ -95,9 +117,32 @@ export default function BookDetailScreen() {
     if (liking) return;
     const value = reaction === next ? null : next;
     setReaction(value);
-    if (value === null) return;
+    if (value === null) {
+      setLikeCountOverride(serverLikes);
+      setUnlikeCountOverride(serverDislikes);
+      return;
+    }
+
+    const likesNow = likeCountOverride ?? serverLikes;
+    const unlikesNow = unlikeCountOverride ?? serverDislikes;
+    const likeDelta = Number(value === 'like') - Number(reaction === 'like');
+    const unlikeDelta = Number(value === 'unlike') - Number(reaction === 'unlike');
+    setLikeCountOverride(Math.max(0, likesNow + likeDelta));
+    setUnlikeCountOverride(Math.max(0, unlikesNow + unlikeDelta));
     setLiking(true);
-    likeMutation.mutate(value === 'like', { onSettled: () => setLiking(false) });
+    likeMutation.mutate(value === 'like', {
+      onSuccess: (updatedLikes) => {
+        if (updatedLikes >= 0) {
+          setLikeCountOverride(updatedLikes);
+          return;
+        }
+        setReaction(reaction);
+        setLikeCountOverride(null);
+        setUnlikeCountOverride(null);
+        setNotice('পছন্দ আপডেট করা যায়নি। আবার চেষ্টা করুন।');
+      },
+      onSettled: () => setLiking(false),
+    });
   };
 
   return (
@@ -165,9 +210,15 @@ export default function BookDetailScreen() {
             </Text>
             <View style={styles.genreRow}>
               <Text style={[styles.genreLabel, { color: colors.mutedForeground }]}>ধরন: {book.genre}</Text>
-              <View style={[styles.statusPill, { backgroundColor: colors.success }]}>
-                <Text style={[styles.statusText, { color: colors.successText }]}>{book.status}</Text>
-              </View>
+              <Animated.View
+                style={[
+                  styles.statusPill,
+                  { backgroundColor: book.status === 'চলমান' ? colors.success : colors.sky },
+                  { transform: [{ scale: statusScale }] },
+                ]}
+              >
+                <Text style={[styles.statusText, { color: book.status === 'চলমান' ? colors.successText : colors.skyText }]}>{book.status}</Text>
+              </Animated.View>
             </View>
 
             <View style={[styles.stats, { borderTopColor: colors.border }]}>
@@ -210,6 +261,7 @@ export default function BookDetailScreen() {
               icon="thumb-up"
               label="পছন্দ করুন"
               active={reaction === 'like'}
+              count={formatBanglaCount(likeCount)}
               colors={colors}
               onPress={() => toggleReaction('like')}
             />
@@ -218,6 +270,7 @@ export default function BookDetailScreen() {
               icon="thumb-down"
               label="অপছন্দ করুন"
               active={reaction === 'unlike'}
+              count={formatBanglaCount(unlikeCount)}
               colors={colors}
               onPress={() => toggleReaction('unlike')}
             />
@@ -304,6 +357,7 @@ function ReactionButton({
   icon,
   label,
   active,
+  count,
   colors,
   onPress,
 }: {
@@ -311,10 +365,10 @@ function ReactionButton({
   icon: 'thumb-up' | 'thumb-down';
   label: string;
   active: boolean;
+  count: string;
   colors: ReturnType<typeof useColors>;
   onPress: () => void;
 }) {
-  const scale = useRef(new Animated.Value(1)).current;
   const iconName = icon === 'thumb-up'
     ? active ? 'thumb-up' : 'thumb-up-outline'
     : active ? 'thumb-down' : 'thumb-down-outline';
@@ -322,31 +376,20 @@ function ReactionButton({
   return (
     <Pressable
       testID={testID}
-      onPress={() => {
-        Animated.sequence([
-          Animated.spring(scale, { toValue: 1.34, friction: 5, tension: 360, useNativeDriver: true }),
-          Animated.spring(scale, { toValue: 1, friction: 9, tension: 260, useNativeDriver: true }),
-        ]).start();
-        onPress();
-      }}
+      onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={`${label}, ${count}`}
       accessibilityState={{ selected: active }}
       style={styles.reactionTapTarget}
     >
-      <Animated.View
-        style={[
-          styles.actionCircle,
-          { backgroundColor: active ? colors.primary : colors.secondary },
-          { transform: [{ scale }] },
-        ]}
-      >
+      <View style={[styles.actionCircle, { backgroundColor: active ? colors.primary : colors.secondary }]}>
         <MaterialCommunityIcons
           name={iconName}
           size={17}
           color={active ? colors.primaryForeground : colors.mutedForeground}
         />
-      </Animated.View>
+      </View>
+      <Text style={[styles.reactionCount, { color: active ? colors.primary : colors.mutedForeground }]}>{count}</Text>
     </Pressable>
   );
 }
@@ -384,8 +427,9 @@ const styles = StyleSheet.create({
   sectionHeader: { minHeight: 65, borderTopWidth: StyleSheet.hairlineWidth, marginTop: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   sectionTitle: { flex: 1, fontSize: 18, fontWeight: '700' },
   sectionActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  reactionTapTarget: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
+  reactionTapTarget: { minWidth: 42, height: 52, alignItems: 'center', justifyContent: 'center' },
   actionCircle: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  reactionCount: { fontSize: 9, lineHeight: 11, marginTop: 1, fontWeight: '600' },
   commentCircle: { position: 'relative', width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   commentBadge: { position: 'absolute', top: -3, right: -2, minWidth: 16, height: 16, borderRadius: 8, overflow: 'hidden', textAlign: 'center', fontSize: 9, fontWeight: '700' },
   chapterList: { gap: 9 },
