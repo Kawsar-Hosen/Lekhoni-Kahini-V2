@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "লেখনি কাহিনী",
+    "slug": "lekhoni-kahini",
+    "version": "1.3.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/lekhoni-kahini-logo.png",
+    "scheme": "lekhoni-kahini",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#0b080d",
+      "image": "./assets/images/lekhoni-kahini-logo.png",
+      "resizeMode": "contain"
+    },
+    "ios": {
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "com.lekhoni.kahini",
+      "versionCode": 7
+    },
+    "web": {
+      "favicon": "./assets/images/lekhoni-kahini-logo.png"
+    },
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
