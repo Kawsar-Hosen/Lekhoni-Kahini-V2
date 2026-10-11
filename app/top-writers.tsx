@@ -9,6 +9,7 @@ import { useBooks, useFollowedIds, useToggleFollow, useWriters } from '@/hooks/u
 import { coverSource, formatBanglaCount, isVerifiedWriter, toBanglaDigits, writerBooks, writerDisplayName } from '@/lib/adapters';
 import { useResponsive } from '@/hooks/useResponsive';
 import { useColors } from '@/hooks/useColors';
+import { goBackOrFallback } from '@/lib/navigation';
 
 export default function TopWritersScreen() {
   const colors = useColors();
@@ -33,7 +34,7 @@ export default function TopWritersScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.background, paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <Pressable testID="top-writers-back" onPress={() => router.back()} style={styles.headerButton} accessibilityRole="button" accessibilityLabel="ফিরে যান">
+        <Pressable testID="top-writers-back" onPress={() => goBackOrFallback('/')} style={styles.headerButton} accessibilityRole="button" accessibilityLabel="ফিরে যান">
           <Feather name="arrow-left" size={24} color={colors.primary} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: colors.primary }]}>Top Writers</Text>

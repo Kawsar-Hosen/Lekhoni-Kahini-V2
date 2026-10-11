@@ -10,6 +10,7 @@ import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollV
 import { GoogleAuthButton } from '@/components/GoogleAuthButton';
 import { useWriterAccess } from '@/context/WriterAccessContext';
 import { useColors } from '@/hooks/useColors';
+import { goBackOrFallback } from '@/lib/navigation';
 
 export default function RegisterScreen() {
   const colors = useColors();
@@ -53,7 +54,7 @@ export default function RegisterScreen() {
         contentContainerStyle={[styles.content, { paddingTop: topInset + 8, paddingBottom: insets.bottom + 28 }]}
         showsVerticalScrollIndicator={false}
       >
-        <Pressable testID="auth-back" onPress={() => router.back()} hitSlop={12} style={styles.backButton}>
+        <Pressable testID="auth-back" onPress={() => goBackOrFallback('/auth/login')} hitSlop={12} style={styles.backButton}>
           <Feather name="arrow-left" size={25} color={colors.foreground} />
         </Pressable>
 

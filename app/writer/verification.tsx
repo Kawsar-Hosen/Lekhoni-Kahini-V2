@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText as Text, AppTextInput } from '@/components/AppText';
 import { useWriterAccess } from '@/context/WriterAccessContext';
 import { useColors } from '@/hooks/useColors';
+import { goBackOrFallback } from '@/lib/navigation';
 
 export default function WriterVerificationScreen() {
   const colors = useColors();
@@ -58,7 +59,7 @@ export default function WriterVerificationScreen() {
       <View style={styles.header}>
         <Pressable
           testID="verification-back"
-          onPress={() => router.back()}
+          onPress={() => goBackOrFallback(session ? '/writer/panel' : '/auth/login')}
           accessibilityRole="button"
           accessibilityLabel="ফিরে যান"
           style={[styles.headerButton, { backgroundColor: colors.secondary }]}

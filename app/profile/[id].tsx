@@ -9,6 +9,7 @@ import { useBooks, useFollowedIds, useToggleFollow, useWriter } from '@/hooks/us
 import { coverSource, formatBanglaCount, isVerifiedWriter, toBanglaDigits, toUiBook, writerBooks, writerDisplayName } from '@/lib/adapters';
 import { bookLikes, bookViews } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
+import { goBackOrFallback } from '@/lib/navigation';
 
 const authorPortrait = require('@/assets/images/author-profile.png');
 
@@ -76,7 +77,7 @@ export default function AuthorProfileScreen() {
     return (
       <View style={[styles.notFound, { backgroundColor: colors.background }]}>
         <Text style={[styles.notFoundText, { color: colors.foreground }]}>লেখককে খুঁজে পাওয়া যায়নি</Text>
-        <Pressable onPress={() => router.back()} style={[styles.backButton, { backgroundColor: colors.secondary }]}>
+        <Pressable onPress={() => goBackOrFallback('/')} style={[styles.backButton, { backgroundColor: colors.secondary }]}>
           <Text style={[styles.backButtonText, { color: colors.primary }]}>ফিরে যান</Text>
         </Pressable>
       </View>
@@ -88,7 +89,7 @@ export default function AuthorProfileScreen() {
       <View style={styles.header}>
         <Pressable
           testID="author-profile-back"
-          onPress={() => router.back()}
+          onPress={() => goBackOrFallback('/')}
           accessibilityRole="button"
           accessibilityLabel="ফিরে যান"
           style={[styles.headerCircle, { backgroundColor: colors.secondary }]}

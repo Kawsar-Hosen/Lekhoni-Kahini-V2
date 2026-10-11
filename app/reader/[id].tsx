@@ -11,6 +11,7 @@ import { getOfflineChapters } from '@/lib/offline';
 import { useLibrary } from '@/context/LibraryContext';
 import type { ApiChapter } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
+import { goBackOrFallback } from '@/lib/navigation';
 
 export default function ReaderScreen() {
   const { id, chapter } = useLocalSearchParams<{ id: string; chapter?: string }>();
@@ -59,7 +60,7 @@ export default function ReaderScreen() {
       <View style={[styles.topBar, { paddingTop: insets.top + 8, borderBottomColor: isDarkPage ? 'rgba(255,255,255,0.12)' : colors.border }]}>
         <Pressable
           testID="reader-back"
-          onPress={() => router.back()}
+          onPress={() => goBackOrFallback({ pathname: '/book/[id]', params: { id } })}
           hitSlop={10}
           style={styles.headerButton}
           accessibilityRole="button"

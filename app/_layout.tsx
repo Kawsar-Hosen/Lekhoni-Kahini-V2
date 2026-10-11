@@ -34,7 +34,14 @@ const queryClient = new QueryClient({
 
 function RootLayoutNav() {
   return (
-    <Stack screenOptions={{ headerShown: false, headerBackTitle: 'Back' }}>
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        headerBackTitle: 'Back',
+        animation: 'slide_from_right',
+        gestureEnabled: true,
+      }}
+    >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="book/[id]" options={{ headerShown: false }} />
       <Stack.Screen name="reader/[id]" options={{ headerShown: false }} />

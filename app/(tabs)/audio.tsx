@@ -8,6 +8,7 @@ import { useBooks } from '@/hooks/useLekhoni';
 import { toUiBook } from '@/lib/adapters';
 import { bookViews } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
+import { goBackOrFallback } from '@/lib/navigation';
 
 export default function AudioScreen() {
   const colors = useColors();
@@ -16,7 +17,7 @@ export default function AudioScreen() {
   const books = [...(apiBooks ?? [])].sort((a, b) => bookViews(b) - bookViews(a)).slice(0, 3).map(toUiBook);
   return (
     <ScrollView style={{ backgroundColor: colors.background }} contentContainerStyle={{ paddingTop: insets.top, paddingBottom: Platform.OS === 'web' ? 105 : 92 }}>
-      <View style={styles.header}><Pressable onPress={() => router.back()} hitSlop={10}><Feather name="arrow-left" size={23} color={colors.primary} /></Pressable><Text style={[styles.title, { color: colors.primary }]}>অডিও গল্প</Text><View style={{ width: 23 }} /></View>
+      <View style={styles.header}><Pressable testID="audio-back" onPress={() => goBackOrFallback('/')} hitSlop={10} accessibilityRole="button" accessibilityLabel="ফিরে যান"><Feather name="arrow-left" size={23} color={colors.primary} /></Pressable><Text style={[styles.title, { color: colors.primary }]}>অডিও গল্প</Text><View style={{ width: 23 }} /></View>
       <View style={[styles.hero, { backgroundColor: colors.deepInk }]}>
         <View style={[styles.heroOrb, { backgroundColor: colors.wine }]} />
         <View style={styles.heroCopy}><Text style={styles.eyebrow}>শুনুন, চোখ বন্ধ করে</Text><Text style={styles.heroTitle}>গল্প এখন আপনার কানে</Text><Text style={styles.heroText}>যাতায়াত বা বিশ্রামের সময় প্রিয় গল্প শুনুন।</Text></View>

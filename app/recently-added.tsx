@@ -9,6 +9,7 @@ import { useBooks } from '@/hooks/useLekhoni';
 import { toUiBook } from '@/lib/adapters';
 import { isNewBook } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
+import { goBackOrFallback } from '@/lib/navigation';
 
 function formatAddedDate(iso?: string): string {
   const t = iso ? new Date(iso).getTime() : NaN;
@@ -29,7 +30,7 @@ export default function RecentlyAddedScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: topInset + 7 }]}>
-        <Pressable testID="recently-added-back" onPress={() => router.back()} style={styles.headerButton} accessibilityRole="button" accessibilityLabel="ফিরে যান">
+        <Pressable testID="recently-added-back" onPress={() => goBackOrFallback('/')} style={styles.headerButton} accessibilityRole="button" accessibilityLabel="ফিরে যান">
           <Feather name="arrow-left" size={24} color={colors.primary} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: colors.primary }]}>Recently Added</Text>

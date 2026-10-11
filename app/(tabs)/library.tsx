@@ -11,6 +11,7 @@ import { useResponsive } from '@/hooks/useResponsive';
 import { useColors } from '@/hooks/useColors';
 import { useLibrary } from '@/context/LibraryContext';
 import { useDisplay } from '@/context/DisplayContext';
+import { goBackOrFallback } from '@/lib/navigation';
 
 const filters = ['ডাউনলোড', 'অডিও', 'ফেভারিট', 'ইতিহাস'];
 
@@ -36,7 +37,15 @@ export default function LibraryScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.background, paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={10}><Feather name="arrow-left" size={23} color={colors.primary} /></Pressable>
+        <Pressable
+          testID="library-back"
+          onPress={() => goBackOrFallback('/')}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="ফিরে যান"
+        >
+          <Feather name="arrow-left" size={23} color={colors.primary} />
+        </Pressable>
         <Text style={[styles.headerTitle, { color: colors.primary }]}>লাইব্রেরি</Text>
         <View style={{ width: 23 }} />
       </View>

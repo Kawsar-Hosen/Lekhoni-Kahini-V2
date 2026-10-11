@@ -9,6 +9,7 @@ import { useBooks, useFollowedIds, useToggleFollow, useWriters } from '@/hooks/u
 import { coverSource, formatBanglaCount, isVerifiedWriter, writerBooks, writerDisplayName } from '@/lib/adapters';
 import type { ApiBook, ApiWriter } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
+import { goBackOrFallback } from '@/lib/navigation';
 
 export default function FollowingScreen() {
   const colors = useColors();
@@ -32,7 +33,7 @@ export default function FollowingScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: topInset + 8, borderBottomColor: colors.border }]}>
-        <Pressable testID="following-back" onPress={() => router.back()} hitSlop={12} style={styles.backButton}>
+        <Pressable testID="following-back" onPress={() => goBackOrFallback('/')} hitSlop={12} style={styles.backButton}>
           <Feather name="arrow-left" size={24} color={colors.primary} />
         </Pressable>
         <Text style={[styles.title, { color: colors.primary }]}>ফলো করা লেখক লিস্ট</Text>

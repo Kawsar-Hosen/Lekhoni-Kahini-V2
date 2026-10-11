@@ -9,6 +9,7 @@ import { useBooks, useCategories } from '@/hooks/useLekhoni';
 import { toBanglaDigits, toUiBook } from '@/lib/adapters';
 import { useLibrary } from '@/context/LibraryContext';
 import { useColors } from '@/hooks/useColors';
+import { goBackOrFallback } from '@/lib/navigation';
 
 export default function CategoryBooksScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -25,7 +26,7 @@ export default function CategoryBooksScreen() {
     return (
       <View style={[styles.notFound, { backgroundColor: colors.background }]}>
         <Text style={[styles.notFoundText, { color: colors.foreground }]}>ক্যাটাগরি পাওয়া যায়নি</Text>
-        <Pressable onPress={() => router.back()} style={[styles.backButton, { backgroundColor: colors.secondary }]}>
+        <Pressable onPress={() => goBackOrFallback('/(tabs)/categories')} style={[styles.backButton, { backgroundColor: colors.secondary }]}>
           <Text style={[styles.backButtonText, { color: colors.primary }]}>ফিরে যান</Text>
         </Pressable>
       </View>
@@ -35,7 +36,7 @@ export default function CategoryBooksScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: topInset + 7 }]}>
-        <Pressable testID="category-books-back" onPress={() => router.back()} style={styles.headerButton} accessibilityRole="button" accessibilityLabel="ফিরে যান">
+        <Pressable testID="category-books-back" onPress={() => goBackOrFallback('/(tabs)/categories')} style={styles.headerButton} accessibilityRole="button" accessibilityLabel="ফিরে যান">
           <Feather name="arrow-left" size={24} color={colors.primary} />
         </Pressable>
         <Text numberOfLines={1} style={[styles.headerTitle, { color: colors.primary }]}>{category.name}</Text>

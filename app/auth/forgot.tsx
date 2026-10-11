@@ -1,13 +1,14 @@
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { BackHandler, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { AppText as Text } from '@/components/AppText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthField } from '@/components/AuthField';
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
 import { useWriterAccess } from '@/context/WriterAccessContext';
 import { useColors } from '@/hooks/useColors';
+import { goBackOrFallback } from '@/lib/navigation';
 
 export default function ForgotPasswordScreen() {
   const colors = useColors();
@@ -22,6 +23,31 @@ export default function ForgotPasswordScreen() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
+
+  const handleBack = () => {
+    if (step === 'reset') {
+      setStep('email');
+      setCode('');
+      setPassword('');
+      setError('');
+      setSent(false);
+      return;
+    }
+    goBackOrFallback('/auth/login');
+  };
+
+  useEffect(() => {
+    if (Platform.OS !== 'android' || step !== 'reset') return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      setStep('email');
+      setCode('');
+      setPassword('');
+      setError('');
+      setSent(false);
+      return true;
+    });
+    return () => subscription.remove();
+  }, [step]);
 
   const sendCode = async () => {
     if (busy) return;
@@ -68,7 +94,12 @@ export default function ForgotPasswordScreen() {
         contentContainerStyle={[styles.content, { paddingTop: topInset + 8, paddingBottom: insets.bottom + 28 }]}
         showsVerticalScrollIndicator={false}
       >
-        <Pressable testID="auth-back" onPress={() => router.back()} hitSlop={12} style={styles.backButton}>
+        <Pressable
+          testID="auth-back"
+          onPress={handleBack}
+          hitSlop={12}
+          style={styles.backButton}
+        >
           <Feather name="arrow-left" size={25} color={colors.foreground} />
         </Pressable>
 

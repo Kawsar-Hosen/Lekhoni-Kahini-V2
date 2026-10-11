@@ -15,6 +15,7 @@ import { displayAuthor } from '@/lib/api';
 import { clearOfflineChapters, saveOfflineChapters } from '@/lib/offline';
 import { useResponsive } from '@/hooks/useResponsive';
 import { useColors } from '@/hooks/useColors';
+import { goBackOrFallback } from '@/lib/navigation';
 
 export default function BookDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -108,7 +109,7 @@ export default function BookDetailScreen() {
         <View style={[styles.topBar, { paddingTop: topInset + 8 }]}>
           <Pressable
             testID="book-detail-back"
-            onPress={() => router.back()}
+            onPress={() => goBackOrFallback('/')}
             accessibilityRole="button"
             accessibilityLabel="ফিরে যান"
             style={styles.headerButton}

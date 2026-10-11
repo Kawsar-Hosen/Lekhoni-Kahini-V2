@@ -11,6 +11,7 @@ import { addSearchTerm, getSearchHistory } from '@/lib/storage';
 import type { Book } from '@/data/books';
 import { useColors } from '@/hooks/useColors';
 import { useResponsive } from '@/hooks/useResponsive';
+import { goBackOrFallback } from '@/lib/navigation';
 
 type LiveBook = Book;
 
@@ -104,7 +105,7 @@ export default function SearchScreen() {
         <View style={styles.header}>
           <Pressable
             testID="search-back"
-            onPress={() => router.back()}
+            onPress={() => goBackOrFallback('/')}
             accessibilityRole="button"
             accessibilityLabel="ফিরে যান"
             style={styles.backButton}
