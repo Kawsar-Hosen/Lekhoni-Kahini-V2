@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 type LibraryContextValue = {
   savedIds: string[];
@@ -8,6 +8,7 @@ type LibraryContextValue = {
   historyIds: string[];
   toggleSaved: (id: string) => void;
   toggleDownloaded: (id: string) => void;
+  setDownloaded: (id: string, downloaded: boolean) => void;
   clearDownloads: () => void;
   addToHistory: (id: string) => void;
 };
@@ -36,6 +37,12 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
     ]);
   }, [downloadedIds, historyIds, savedIds]);
 
+  const setDownloaded = useCallback((id: string, downloaded: boolean) => {
+    setDownloadedIds((current) => downloaded
+      ? current.includes(id) ? current : [...current, id]
+      : current.filter((item) => item !== id));
+  }, []);
+
   const value = useMemo(
     () => ({
       savedIds,
@@ -49,10 +56,11 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         setDownloadedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
       },
+      setDownloaded,
       clearDownloads: () => setDownloadedIds([]),
       addToHistory: (id: string) => setHistoryIds((current) => [id, ...current.filter((item) => item !== id)].slice(0, 12)),
     }),
-    [downloadedIds, historyIds, savedIds],
+    [downloadedIds, historyIds, savedIds, setDownloaded],
   );
 
   return <LibraryContext.Provider value={value}>{children}</LibraryContext.Provider>;

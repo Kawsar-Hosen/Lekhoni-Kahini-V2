@@ -3,28 +3,55 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { ApiChapter } from './api';
 
 const key = (bookId: string) => `lk-offline-chapters:${bookId}`;
+const pendingWrites = new Map<string, Promise<boolean>>();
 
-export async function saveOfflineChapters(bookId: string, chapters: ApiChapter[]): Promise<void> {
-  try {
-    await AsyncStorage.setItem(key(bookId), JSON.stringify(chapters.slice(0, 200)));
-  } catch {}
+function enqueueWrite(bookId: string, write: () => Promise<void>): Promise<boolean> {
+  const previous = pendingWrites.get(bookId) ?? Promise.resolve(true);
+  const current = previous
+    .catch(() => false)
+    .then(async () => {
+      await write();
+      return true;
+    })
+    .catch(() => false);
+  pendingWrites.set(bookId, current);
+  void current.finally(() => {
+    if (pendingWrites.get(bookId) === current) pendingWrites.delete(bookId);
+  });
+  return current;
 }
 
-export async function getOfflineChapters(bookId: string): Promise<ApiChapter[] | null> {
+async function readOfflineChapters(bookId: string): Promise<ApiChapter[] | null> {
   try {
     const raw = await AsyncStorage.getItem(key(bookId));
     if (!raw) return null;
     const parsed = JSON.parse(raw) as ApiChapter[];
-    return Array.isArray(parsed) ? parsed : null;
+    return Array.isArray(parsed) ? parsed.sort((a, b) => a.position - b.position) : null;
   } catch {
     return null;
   }
 }
 
-export async function clearOfflineChapters(bookId: string): Promise<void> {
-  try {
-    await AsyncStorage.removeItem(key(bookId));
-  } catch {}
+export function saveOfflineChapters(bookId: string, chapters: ApiChapter[]): Promise<boolean> {
+  return enqueueWrite(bookId, () => AsyncStorage.setItem(key(bookId), JSON.stringify(chapters.slice(0, 200))));
+}
+
+export function saveOfflineChapter(bookId: string, chapter: ApiChapter): Promise<boolean> {
+  return enqueueWrite(bookId, async () => {
+    const current = await readOfflineChapters(bookId) ?? [];
+    const byId = new Map(current.map((item) => [item.id, item]));
+    byId.set(chapter.id, chapter);
+    await AsyncStorage.setItem(key(bookId), JSON.stringify([...byId.values()].slice(-200)));
+  });
+}
+
+export async function getOfflineChapters(bookId: string): Promise<ApiChapter[] | null> {
+  await pendingWrites.get(bookId);
+  return readOfflineChapters(bookId);
+}
+
+export function clearOfflineChapters(bookId: string): Promise<boolean> {
+  return enqueueWrite(bookId, () => AsyncStorage.removeItem(key(bookId)));
 }
 
 export async function clearAllOfflineChapters(): Promise<void> {
@@ -32,7 +59,9 @@ export async function clearAllOfflineChapters(): Promise<void> {
     const keys = await AsyncStorage.getAllKeys();
     const ours = keys.filter((k) => k.startsWith('lk-offline-chapters:'));
     if (ours.length) await AsyncStorage.multiRemove(ours);
-  } catch {}
+  } catch {
+    // Keep the app usable if the device storage is temporarily unavailable.
+  }
 }
 
 export async function getOfflineBytes(): Promise<number> {

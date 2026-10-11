@@ -1,6 +1,6 @@
 import { Feather, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Image, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText as Text } from '@/components/AppText';
@@ -12,7 +12,8 @@ import { useBook, useComments, useRecordView, useToggleLike, useWriters } from '
 import { bookLikesCount, coverSource, formatBanglaCount, formatCount, mapStatus, toBanglaDigits, toUiBook } from '@/lib/adapters';
 import { bookViewsCount } from '@/lib/adapters';
 import { displayAuthor } from '@/lib/api';
-import { clearOfflineChapters, saveOfflineChapters } from '@/lib/offline';
+import { clearOfflineChapters, getOfflineChapters, saveOfflineChapter, saveOfflineChapters } from '@/lib/offline';
+import type { ApiChapter } from '@/lib/api';
 import { useResponsive } from '@/hooks/useResponsive';
 import { useColors } from '@/hooks/useColors';
 import { goBackOrFallback } from '@/lib/navigation';
@@ -21,7 +22,7 @@ export default function BookDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { savedIds, downloadedIds, toggleSaved, toggleDownloaded, addToHistory } = useLibrary();
+  const { savedIds, toggleSaved, setDownloaded, addToHistory } = useLibrary();
   const { isSmallPhone } = useResponsive();
   const { data: apiBook, isLoading } = useBook(id);
   const { data: apiWriters } = useWriters();
@@ -35,18 +36,35 @@ export default function BookDetailScreen() {
   const [reaction, setReaction] = useState<'like' | 'unlike' | null>(null);
   const [notice, setNotice] = useState('');
   const [liking, setLiking] = useState(false);
+  const [savedChapters, setSavedChapters] = useState<ApiChapter[]>([]);
+  const [downloadingChapters, setDownloadingChapters] = useState(false);
+  const [savingChapterId, setSavingChapterId] = useState<string | null>(null);
   const [likeCountOverride, setLikeCountOverride] = useState<number | null>(null);
   const [unlikeCountOverride, setUnlikeCountOverride] = useState<number | null>(null);
   const lastServerCounts = useRef({ likes: 0, dislikes: 0 });
   const statusScale = useRef(new Animated.Value(1)).current;
   const saved = book ? savedIds.includes(book.id) : false;
-  const downloaded = book ? downloadedIds.includes(book.id) : false;
   const serverLikes = apiBook ? bookLikesCount(apiBook) : 0;
   const serverDislikes = apiBook?.dislikes !== undefined ? bookViewsCount({ views: apiBook.dislikes }) : 0;
   const likeCount = likeCountOverride ?? serverLikes;
   const unlikeCount = unlikeCountOverride ?? serverDislikes;
+  const savedChapterIds = useMemo(() => new Set(savedChapters.map((chapter) => chapter.id)), [savedChapters]);
+  const savedChapterCount = chapters.filter((chapter) => savedChapterIds.has(chapter.id)).length;
+  const allChaptersSaved = chapters.length > 0 && savedChapterCount === chapters.length;
   const topInset = Platform.OS === 'web' ? Math.max(insets.top, 67) : insets.top;
   const authorPortrait = apiBook ? coverSource(null, displayAuthor(apiBook)) : require('@/assets/images/author-profile.png');
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      void getOfflineChapters(id).then((offline) => {
+        if (active) setSavedChapters(offline ?? []);
+      });
+      return () => {
+        active = false;
+      };
+    }, [id]),
+  );
 
   useEffect(() => {
     if (serverLikes !== lastServerCounts.current.likes) setLikeCountOverride(null);
@@ -66,6 +84,53 @@ export default function BookDetailScreen() {
     return () => animation.stop();
   }, [book?.status, statusScale]);
 
+  const downloadAllChapters = async () => {
+    if (!book || !chapters.length || downloadingChapters) return;
+    setDownloadingChapters(true);
+    const saved = await saveOfflineChapters(book.id, chapters);
+    if (saved) {
+      setSavedChapters(chapters);
+      setDownloaded(book.id, true);
+    } else {
+      setNotice('পর্বগুলো অফলাইনে সেভ করা যায়নি। আবার চেষ্টা করুন।');
+    }
+    setDownloadingChapters(false);
+  };
+
+  const toggleDownload = async () => {
+    if (!book || !chapters.length || downloadingChapters) return;
+    if (!allChaptersSaved) {
+      await downloadAllChapters();
+      return;
+    }
+
+    setDownloadingChapters(true);
+    const cleared = await clearOfflineChapters(book.id);
+    if (cleared) {
+      setSavedChapters([]);
+      setDownloaded(book.id, false);
+    } else {
+      setNotice('ডাউনলোড মুছতে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
+    }
+    setDownloadingChapters(false);
+  };
+
+  const downloadChapter = async (chapter: ApiChapter) => {
+    if (!book || savedChapterIds.has(chapter.id) || savingChapterId) return;
+    setSavingChapterId(chapter.id);
+    const saved = await saveOfflineChapter(book.id, chapter);
+    if (saved) {
+      setSavedChapters((current) => [
+        ...current.filter((item) => item.id !== chapter.id),
+        chapter,
+      ].sort((a, b) => a.position - b.position));
+      setDownloaded(book.id, true);
+    } else {
+      setNotice('এই পর্বটি অফলাইনে সেভ করা যায়নি। আবার চেষ্টা করুন।');
+    }
+    setSavingChapterId(null);
+  };
+
   const startReading = () => {
     if (!book) return;
     addToHistory(book.id);
@@ -82,13 +147,6 @@ export default function BookDetailScreen() {
         || (w.writer_name && (w.writer_name.toLowerCase() === a || w.writer_name.toLowerCase() === an));
     });
     if (match) router.push({ pathname: '/profile/[id]', params: { id: match.id } });
-  };
-
-  const toggleDownload = () => {
-    if (!book) return;
-    if (!downloaded && chapters.length) void saveOfflineChapters(book.id, chapters);
-    if (downloaded) void clearOfflineChapters(book.id);
-    toggleDownloaded(book.id);
   };
 
   if (!book) {
@@ -241,17 +299,46 @@ export default function BookDetailScreen() {
             <Pressable
               testID="download-book"
               onPress={toggleDownload}
+              disabled={downloadingChapters || !chapters.length}
             style={({ pressed }) => [
               styles.downloadButton,
               { borderColor: colors.primary, backgroundColor: colors.secondary, opacity: pressed ? 0.78 : 1 },
             ]}
           >
-            <Feather name={downloaded ? 'check' : 'download'} size={17} color={colors.primary} />
-            <Text style={[styles.downloadText, { color: colors.primary }]}>
-              {downloaded ? 'ডাউনলোড হয়েছে' : 'অফলাইনে ডাউনলোড'}
+            <Feather name={allChaptersSaved ? 'check' : 'download'} size={17} color={colors.primary} />
+            <Text numberOfLines={1} style={[styles.downloadText, { color: colors.primary }]}>
+              {downloadingChapters ? 'সেভ হচ্ছে…' : allChaptersSaved ? 'ডাউনলোড হয়েছে' : savedChapterCount ? 'বাকি পর্ব ডাউনলোড' : 'অফলাইনে ডাউনলোড'}
             </Text>
           </Pressable>
         </View>
+
+        {chapters.length ? (
+          <View style={[styles.offlineBanner, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+            <Feather name={allChaptersSaved ? 'check-circle' : 'download'} size={21} color={colors.primary} />
+            <View style={styles.offlineBannerCopy}>
+              <Text style={[styles.offlineBannerTitle, { color: colors.foreground }]}>পুরো গল্পটা অফলাইনে রাখুন</Text>
+              <Text style={[styles.offlineBannerSubtitle, { color: colors.mutedForeground }]}>
+                {toBanglaDigits(String(chapters.length))}টি পর্বের মধ্যে {toBanglaDigits(String(savedChapterCount))}টি সেভ আছে
+                {allChaptersSaved ? ' — সব পর্ব অফলাইনে পড়তে পারবেন।' : ' — বাকি পর্বগুলোও ডাউনলোড করুন।'}
+              </Text>
+            </View>
+            <Pressable
+              testID="download-remaining-chapters"
+              onPress={() => void downloadAllChapters()}
+              disabled={allChaptersSaved || downloadingChapters}
+              accessibilityRole="button"
+              accessibilityLabel={allChaptersSaved ? 'সব পর্ব সেভ করা আছে' : 'বাকি সব পর্ব ডাউনলোড করুন'}
+              style={({ pressed }) => [
+                styles.downloadAllButton,
+                { backgroundColor: allChaptersSaved ? colors.success : colors.primary, opacity: pressed ? 0.82 : 1 },
+              ]}
+            >
+              <Text numberOfLines={1} style={[styles.downloadAllText, { color: allChaptersSaved ? colors.successText : colors.primaryForeground }]}>
+                {downloadingChapters ? 'সেভ হচ্ছে…' : allChaptersSaved ? 'সেভ হয়েছে' : 'সব ডাউনলোড'}
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         <View style={[styles.sectionHeader, { borderTopColor: colors.border }]}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>সূচিপত্র ({toBanglaDigits(String(chapters.length))}টি পর্ব)</Text>
@@ -292,25 +379,50 @@ export default function BookDetailScreen() {
         <View style={styles.chapterList}>
           {chapters.map((chapter, index) => {
             const number = toBanglaDigits(String(chapter.position));
+            const isSaved = savedChapterIds.has(chapter.id);
+            const isSaving = savingChapterId === chapter.id;
             return (
-              <Pressable
+              <View
                 key={chapter.id}
                 testID={`chapter-row-${chapter.position}`}
-                onPress={() => {
-                  addToHistory(book.id);
-                  router.push({ pathname: '/reader/[id]', params: { id: book.id, chapter: chapter.id } });
-                }}
                 style={[styles.chapterRow, { backgroundColor: colors.card, borderColor: colors.border }]}
               >
-                <Text style={[styles.chapterNumber, { color: colors.primary }]}>{number}.</Text>
-                <Text style={[styles.chapterTitle, { color: colors.foreground }]}>{chapter.title}</Text>
-                {index === 0 ? (
-                  <View style={[styles.currentChapter, { backgroundColor: colors.cream }]}>
-                    <Text style={[styles.currentChapterText, { color: colors.authorAction }]}>আজকের পর্ব</Text>
-                  </View>
-                ) : null}
-                {index === 0 ? <Feather name="play-circle" size={18} color={colors.primary} /> : null}
-              </Pressable>
+                <Pressable
+                  testID={`open-chapter-${chapter.position}`}
+                  onPress={() => {
+                    addToHistory(book.id);
+                    router.push({ pathname: '/reader/[id]', params: { id: book.id, chapter: chapter.id } });
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${number} নম্বর পর্ব খুলুন`}
+                  style={styles.chapterOpenButton}
+                >
+                  <Text style={[styles.chapterNumber, { color: colors.primary }]}>{number}.</Text>
+                  <Text numberOfLines={1} style={[styles.chapterTitle, { color: colors.foreground }]}>{chapter.title}</Text>
+                  {index === 0 && !isSmallPhone ? (
+                    <View style={[styles.currentChapter, { backgroundColor: colors.cream }]}>
+                      <Text style={[styles.currentChapterText, { color: colors.authorAction }]}>আজকের পর্ব</Text>
+                    </View>
+                  ) : null}
+                </Pressable>
+                <Pressable
+                  testID={`save-chapter-${chapter.position}`}
+                  onPress={() => void downloadChapter(chapter)}
+                  disabled={isSaved || Boolean(savingChapterId)}
+                  accessibilityRole="button"
+                  accessibilityLabel={isSaved ? `${number} নম্বর পর্ব সেভ আছে` : `${number} নম্বর পর্ব ডাউনলোড করুন`}
+                  accessibilityState={{ disabled: isSaved || Boolean(savingChapterId) }}
+                  style={[
+                    styles.chapterDownloadButton,
+                    { backgroundColor: isSaved ? colors.success : colors.secondary, borderColor: isSaved ? colors.success : colors.border },
+                  ]}
+                >
+                  <Feather name={isSaving ? 'loader' : isSaved ? 'check' : 'download'} size={14} color={isSaved ? colors.successText : colors.primary} />
+                  <Text numberOfLines={1} style={[styles.chapterDownloadText, { color: isSaved ? colors.successText : colors.primary }]}>
+                    {isSaving ? 'সেভ হচ্ছে' : isSaved ? 'সেভ আছে' : 'ডাউনলোড'}
+                  </Text>
+                </Pressable>
+              </View>
             );
           })}
         </View>
@@ -424,6 +536,12 @@ const styles = StyleSheet.create({
   primaryButtonText: { fontSize: 13, fontWeight: '700' },
   downloadButton: { flex: 1, minHeight: 49, borderWidth: 1, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   downloadText: { fontSize: 12, fontWeight: '600' },
+  offlineBanner: { minHeight: 76, borderWidth: 1, borderRadius: 16, marginTop: 12, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 9 },
+  offlineBannerCopy: { flex: 1, minWidth: 0, gap: 3 },
+  offlineBannerTitle: { fontSize: 12, fontWeight: '700' },
+  offlineBannerSubtitle: { fontSize: 10, lineHeight: 15 },
+  downloadAllButton: { minHeight: 36, minWidth: 84, maxWidth: 104, paddingHorizontal: 10, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  downloadAllText: { fontSize: 10, fontWeight: '700' },
   sectionHeader: { minHeight: 65, borderTopWidth: StyleSheet.hairlineWidth, marginTop: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   sectionTitle: { flex: 1, fontSize: 18, fontWeight: '700' },
   sectionActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -433,11 +551,14 @@ const styles = StyleSheet.create({
   commentCircle: { position: 'relative', width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   commentBadge: { position: 'absolute', top: -3, right: -2, minWidth: 16, height: 16, borderRadius: 8, overflow: 'hidden', textAlign: 'center', fontSize: 9, fontWeight: '700' },
   chapterList: { gap: 9 },
-  chapterRow: { minHeight: 55, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 9 },
-  chapterNumber: { fontSize: 18, fontWeight: '700' },
-  chapterTitle: { flex: 1, fontSize: 16, fontWeight: '500' },
+  chapterRow: { minHeight: 55, borderWidth: 1, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 7, flexDirection: 'row', alignItems: 'center', gap: 7 },
+  chapterOpenButton: { flex: 1, minWidth: 0, minHeight: 39, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  chapterNumber: { fontSize: 16, fontWeight: '700' },
+  chapterTitle: { flex: 1, minWidth: 0, fontSize: 15, fontWeight: '500' },
   currentChapter: { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
   currentChapterText: { fontSize: 10, fontWeight: '600' },
+  chapterDownloadButton: { minHeight: 33, borderWidth: 1, borderRadius: 17, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  chapterDownloadText: { fontSize: 9, fontWeight: '600' },
   notice: { position: 'absolute', left: 22, right: 22, minHeight: 56, borderRadius: 25, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, elevation: 6 },
   noticeText: { flex: 1, color: '#fff', fontSize: 13, lineHeight: 20 },
 });

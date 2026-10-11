@@ -7,7 +7,7 @@ import { AppText as Text } from '@/components/AppText';
 import { ReaderSettingsSheet } from '@/components/SettingsOverlays';
 import { useBook, useRecordView } from '@/hooks/useLekhoni';
 import { toBanglaDigits } from '@/lib/adapters';
-import { getOfflineChapters } from '@/lib/offline';
+import { getOfflineChapters, saveOfflineChapter } from '@/lib/offline';
 import { useLibrary } from '@/context/LibraryContext';
 import type { ApiChapter } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
@@ -17,9 +17,9 @@ export default function ReaderScreen() {
   const { id, chapter } = useLocalSearchParams<{ id: string; chapter?: string }>();
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { data: apiBook } = useBook(id);
+  const { data: apiBook, isLoading } = useBook(id);
   useRecordView(id);
-  const { addToHistory, downloadedIds } = useLibrary();
+  const { addToHistory, setDownloaded } = useLibrary();
   const [offlineChapters, setOfflineChapters] = useState<ApiChapter[] | null>(null);
   const [chapterId, setChapterId] = useState<string | undefined>(chapter);
   const [fontSize, setFontSize] = useState(21);
@@ -34,18 +34,37 @@ export default function ReaderScreen() {
   }, [chapter, id]);
 
   useEffect(() => {
-    if (downloadedIds.includes(id)) {
-      void getOfflineChapters(id).then(setOfflineChapters);
-    } else {
-      setOfflineChapters(null);
-    }
-  }, [id, downloadedIds]);
+    let active = true;
+    setOfflineChapters(null);
+    if (!id) return () => {
+      active = false;
+    };
+    void getOfflineChapters(id).then((saved) => {
+      if (active) setOfflineChapters(saved);
+    });
+    return () => {
+      active = false;
+    };
+  }, [id]);
 
   const liveChapters = apiBook?.chapters ?? [];
-  const chapters = offlineChapters ?? liveChapters;
-  const activeIndex = Math.max(0, chapters.findIndex((c) => c.id === chapterId));
-  const activeChapter = chapters[activeIndex];
+  const chapters = liveChapters.length ? liveChapters : offlineChapters ?? [];
+  const foundIndex = chapters.findIndex((c) => c.id === chapterId);
+  const activeIndex = Math.max(0, foundIndex);
+  const activeChapter = chapterId ? chapters.find((c) => c.id === chapterId) : chapters[0];
+  const chapterUnavailable = Boolean(chapterId && !activeChapter && !isLoading);
   const paragraphs = (activeChapter?.body || '').split(/\n+/).map((p) => p.trim()).filter(Boolean);
+
+  useEffect(() => {
+    if (!id || !activeChapter) return;
+    let active = true;
+    void saveOfflineChapter(id, activeChapter).then((saved) => {
+      if (active && saved) setDownloaded(id, true);
+    });
+    return () => {
+      active = false;
+    };
+  }, [id, activeChapter?.id, activeChapter?.body, setDownloaded]);
 
   const openChapter = (nextId: string) => {
     addToHistory(id);
@@ -106,16 +125,18 @@ export default function ReaderScreen() {
             {paragraph}
           </Text>
         )) : (
-          <Text style={[styles.paragraph, { color: textColor, fontSize }]}>পর্বের লেখা লোড হচ্ছে…</Text>
+          <Text style={[styles.paragraph, { color: textColor, fontSize }]}>
+            {chapterUnavailable ? 'এই পর্বটি অফলাইনে সেভ নেই। ইন্টারনেট সংযোগে আবার খুলুন।' : 'পর্বের লেখা লোড হচ্ছে…'}
+          </Text>
         )}
       </ScrollView>
 
       <View style={[styles.bottomNavigation, { borderTopColor: colors.border, backgroundColor: isDarkPage ? '#171717' : colors.card, paddingBottom: Math.max(insets.bottom, 8) }]}>
-        <Pressable disabled={activeIndex <= 0} onPress={() => openChapter(chapters[activeIndex - 1].id)} style={styles.chapterNavButton}>
+        <Pressable disabled={!activeChapter || activeIndex <= 0} onPress={() => openChapter(chapters[activeIndex - 1].id)} style={styles.chapterNavButton}>
           <Text style={[styles.chapterNavText, { color: activeIndex <= 0 ? colors.mutedForeground : textColor }]}>← আগের পর্ব</Text>
         </Pressable>
-        <Text style={[styles.pageIndicator, { color: textColor }]}>পর্ব {toBanglaDigits(String(activeIndex + 1))} / {toBanglaDigits(String(chapters.length))}</Text>
-        <Pressable disabled={activeIndex >= chapters.length - 1} onPress={() => openChapter(chapters[activeIndex + 1].id)} style={[styles.chapterNavButton, styles.nextChapter]}>
+        <Text style={[styles.pageIndicator, { color: textColor }]}>পর্ব {toBanglaDigits(String(activeChapter ? activeIndex + 1 : 0))} / {toBanglaDigits(String(chapters.length))}</Text>
+        <Pressable disabled={!activeChapter || activeIndex >= chapters.length - 1} onPress={() => openChapter(chapters[activeIndex + 1].id)} style={[styles.chapterNavButton, styles.nextChapter]}>
           <Text style={[styles.chapterNavText, { color: activeIndex >= chapters.length - 1 ? colors.mutedForeground : textColor }]}>পরের পর্ব →</Text>
         </Pressable>
       </View>
