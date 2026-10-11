@@ -17,6 +17,7 @@ import { NotificationProvider } from '@/context/NotificationContext';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { WriterAccessProvider } from '@/context/WriterAccessContext';
 import { WriterContentProvider } from '@/context/WriterContentContext';
+import { StartupSplashGate } from '@/components/AppSplashScreen';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -100,7 +101,9 @@ export default function RootLayout() {
                 <NotificationProvider>
                   <WriterAccessProvider>
                     <WriterContentProvider>
-                      <RootLayoutNav />
+                      <StartupSplashGate>
+                        <RootLayoutNav />
+                      </StartupSplashGate>
                     </WriterContentProvider>
                   </WriterAccessProvider>
                 </NotificationProvider>

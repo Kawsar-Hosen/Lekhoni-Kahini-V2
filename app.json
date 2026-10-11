@@ -8,9 +8,10 @@
     "scheme": "lekhoni-kahini",
     "userInterfaceStyle": "light",
     "splash": {
-      "backgroundColor": "#0b080d",
+      "backgroundColor": "#fffafb",
       "image": "./assets/images/lekhoni-kahini-logo.png",
-      "resizeMode": "contain"
+      "resizeMode": "contain",
+      "imageWidth": 168
     },
     "ios": {
       "supportsTablet": false
